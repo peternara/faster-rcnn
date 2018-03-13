@@ -1,7 +1,10 @@
 # coding=utf-8
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
-import sample
+
+from anchor import anchor_generate, anchor_clip
+from config import config
+from region_proposals import sample
 
 
 def rpn(inputs,
@@ -25,14 +28,37 @@ def rpn(inputs,
             _, height, width, _ = inputs.get_shape().as_list()
             net = slim.conv2d(inputs, 256, [3, 3], scope='conv1')
             # rpn 分类分支
-            cls = slim.conv2d(net, 2 * anchor_nums, [1, 1], scope='cls_conv1')
-            cls = tf.reshape(cls, [-1, 2], name='cls_reshape')
-            cls = slim.softmax(cls, scope='cls_softmax')
+            scores = slim.conv2d(net, 2 * anchor_nums, [1, 1], scope='cls_conv1')
+            scores = tf.reshape(scores, [-1, 2], name='cls_reshape')
+            scores = slim.softmax(scores, scope='cls_softmax')
 
             # rpn anchor 预测分支
-            anchors = slim.conv2d(net, 4 * anchor_nums, [1, 1], scope='reg_conv1', activation_fn=tf.nn.sigmoid)
-            anchors = tf.reshape(anchors, [-1, 4])
+            anchor_encodes = slim.conv2d(net, 4 * anchor_nums, [1, 1], scope='reg_conv1', activation_fn=tf.nn.sigmoid)
+            anchor_encodes = tf.reshape(anchor_encodes, [-1, 4])
 
-            sampled_cls, sampled_anchors = sample.anchor_sample(cls, anchors, height, width, ground_truth_boxes,
-                                                                is_training, scope='rpn_sample')
-            return sampled_cls, sampled_anchors
+            # 1.生成anchor
+            anchors = anchor_generate.anchor_generate(height, width, config.scales, config.aspect_ratios,
+                                                      config.base_anchor_size, config.anchor_stride)
+
+            # 2.剪裁anchor
+            clip_window = tf.to_float(tf.stack([0, 0, height * config.anchor_stride, width * config.anchor_stride]))
+            if is_training:
+                # 去掉超出图像的框
+                keep = anchor_clip.prune_outside_window(anchors, clip_window)
+                scores = tf.gather(scores, keep)
+                anchors = tf.gather(anchors, keep)
+                anchor_encodes = tf.gather(anchor_encodes, keep)
+            else:
+                anchors, keep = anchor_clip.anchor_clip(anchors, clip_window)
+                scores = tf.gather(scores, keep)
+                anchor_encodes = tf.gather(anchor_encodes, keep)
+
+            prediction_dict = {
+                'rpn_box_predictor_features': rpn_box_predictor_features,
+                'rpn_features_to_crop': rpn_features_to_crop,
+                'image_shape': image_shape,
+                'rpn_box_encodings': rpn_box_encodings,
+                'rpn_objectness_predictions_with_background':
+                    rpn_objectness_predictions_with_background,
+                'anchors': anchors
+            }

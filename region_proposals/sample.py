@@ -6,7 +6,7 @@ from anchor import decode
 import tensorflow as tf
 
 
-def anchor_sample(cls, reg_anchors, height, width, ground_truth_boxes=None, is_training=True, scope='rpn_sample'):
+def anchor_sample(scores, anchor_encodes, height, width, ground_truth_boxes=None, is_training=True, scope='rpn_sample'):
     """
     对rpn网络生成的框进行采样
     :param is_training:
@@ -17,14 +17,16 @@ def anchor_sample(cls, reg_anchors, height, width, ground_truth_boxes=None, is_t
     :param scope:变量范围
     :return:
     """
-    # 1.生成anchor
-    base_anchors = anchor_generate.anchor_generate(height, width, config.scales, config.aspect_ratios,
-                                                   config.base_anchor_size, config.anchor_stride)
 
-    # 2. anchor 回归
-    anchors = decode.anchor_decode(base_anchors, reg_anchors)
 
-    # 3.剪裁anchor
-    keep = anchor_clip.anchor_clip(anchors, height, width, config.anchor_stride, is_training)
+    # 4.nms处理
+    selected_indices = tf.image.non_max_suppression(
+        anchors, cls[:, 0],
+        config.max_output_size, iou_threshold=config.iou_threshold)
 
-    pass
+    anchors = tf.gather(anchors, selected_indices)
+    cls = tf.gather(cls, selected_indices)
+
+    # 正负采样
+    ...
+    return anchors, cls
