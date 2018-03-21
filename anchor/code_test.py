@@ -1,5 +1,5 @@
 import tensorflow as tf
-import anchor.decode as decode
+import anchor.code as decode
 
 
 class DecodeTest(tf.test.TestCase):

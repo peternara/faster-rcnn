@@ -1,3 +1,5 @@
+# coding=utf-8
+from __future__ import division
 import tensorflow as tf
 
 
@@ -14,7 +16,7 @@ def anchor_generate(height, width, scales, aspect_ratios, base_anchor_size, anch
                            base_anchor_size,
                            anchor_stride)
     # 将anchor移到目标中心
-    anchors = anchors + anchor_stride/2
+    anchors = anchors + anchor_stride / 2
     return anchors
 
 
@@ -32,8 +34,8 @@ def tile_anchors(height, width, scales, aspect_ratios, base_anchor_size, anchor_
 
     widths_grid, x_centers_grid = tf.meshgrid(widths, x_centers)
     heights_grid, y_centers_grid = tf.meshgrid(heights, y_centers)
-    bbox_centers = tf.stack([x_centers_grid, y_centers_grid], axis=2)
-    bbox_sizes = tf.stack([widths_grid, heights_grid], axis=2)
+    bbox_centers = tf.stack([y_centers_grid, x_centers_grid], axis=2)
+    bbox_sizes = tf.stack([heights_grid, widths_grid], axis=2)
     bbox_centers = tf.reshape(bbox_centers, [-1, 2])
     bbox_sizes = tf.reshape(bbox_sizes, [-1, 2])
     bbox_corners = _center_size_bbox_to_corners_bbox(bbox_centers, bbox_sizes)
